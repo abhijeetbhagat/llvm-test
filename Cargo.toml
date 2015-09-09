@@ -1,0 +1,7 @@
+[package]
+name = "llvm-test"
+version = "0.1.0"
+authors = ["abhijeetbhagat <abhijeetbhagat@myopera.com>"]
+
+[dependencies]
+llvm-sys = "0.2.0"
