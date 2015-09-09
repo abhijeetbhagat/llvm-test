@@ -104,7 +104,6 @@ impl IRBuilder for Expr{
                     Ok(llvm::core::LLVMConstReal(ty, *i as f64))
                 },
                 &Expr::AddExpr(ref e1, ref e2) => {
-                    println!("add called");
                     let ev1 = try!(e1.codegen(ctxt));
                     let ev2 = try!(e2.codegen(ctxt));
                     Ok(llvm::core::LLVMBuildFAdd(ctxt.builder, ev1, ev2, "add_tmp".as_ptr() as *const i8))
@@ -120,19 +119,12 @@ fn main(){
 
         let mut ctxt = Context::new("mod1");
 
-        //printf prototype
-        // let print_ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
-        // let mut pf_type_args_vec = Vec::new(); 
-        // pf_type_args_vec.push(llvm::target::LLVMIntPtrTypeInContext(ctxt.context, ptr::null_mut()));
-        // let proto = llvm::core::LLVMFunctionType(print_ty, pf_type_args_vec.as_mut_ptr(), 1, 1);
-        // let print_function = llvm::core::LLVMAddFunction(ctxt.module, 
-        //                                                  "printf".as_ptr() as *const i8, 
-        //                                                  proto);
-
         let print_ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
         let mut pf_type_args_vec = Vec::new(); 
         let p = libc::malloc(mem::size_of::<llvm::target::LLVMTargetDataRef>() as libc::size_t) 
             as *mut llvm::target::LLVMTargetDataRef;
+
+        //"e" is little endian because of x86
         pf_type_args_vec.push(llvm::target::LLVMIntPtrTypeInContext(ctxt.context, 
                                                                     llvm::target::LLVMCreateTargetData("e".as_ptr() as *const i8)));
         //pf_type_args_vec.push(llvm::core::LLVMIntTypeInContext(ctxt.context, 32));
@@ -161,25 +153,22 @@ fn main(){
                                             "entry".as_ptr() as *const i8);
         llvm::core::LLVMPositionBuilderAtEnd(ctxt.builder, bb);
 
-        //preparing printf call
-        //
-        // let gstr = llvm::core::LLVMBuildGlobalStringPtr(ctxt.builder, 
-        //                                                 "abhi".as_ptr() as *const i8, 
-        //                                                 ".str".as_ptr() as *const i8);
-
-        /*
-        pub fn LLVMBuildCall(arg1: LLVMBuilderRef, Fn: LLVMValueRef,
-                         Args: *mut LLVMValueRef, NumArgs: ::libc::c_uint,
-                         Name: *const ::libc::c_char) -> LLVMValueRef;
-         */
-        // let mut pf_args = Vec::new();
-        // pf_args.push(gstr);
-        // let print_call = llvm::core::LLVMBuildCall(ctxt.builder,
-        //                                            print_function,
-        //                                            pf_args.as_mut_ptr(),
-        //                                            1,
-        //                                            "name".as_ptr() as *const i8);
-
+        // pub unsafe extern fn LLVMBuildCall(arg1: LLVMBuilderRef, 
+        // Fn: LLVMValueRef, 
+        // Args: *mut LLVMValueRef, 
+        // NumArgs: c_uint, 
+        // Name: *const c_char) -> LLVMValueRef
+        let gstr = llvm::core::LLVMBuildGlobalStringPtr(ctxt.builder, 
+                                                        "abhi".as_ptr() as *const i8, 
+                                                        ".str".as_ptr() as *const i8);
+        let mut pf_args = Vec::new();
+        pf_args.push(gstr);
+        llvm::core::LLVMBuildCall(ctxt.builder, 
+                                  print_function, 
+                                  pf_args.as_mut_ptr(), 
+                                  1, 
+                                  "call".as_ptr() as *const i8);
+        //build return expression
         llvm::core::LLVMBuildRet(ctxt.builder, unwrapped_body);
 
         ctxt.dump();
