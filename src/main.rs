@@ -4,7 +4,7 @@ extern crate llvm_sys as llvm;
 extern crate rustc;
 extern crate libc;
 use std::ptr;
-
+use std::ffi;
 use rustc::lib::llvm as rustc_llvm;
 
 use std::collections::{HashMap};
@@ -61,7 +61,7 @@ impl Context{
     fn new(module_name : &str) -> Self{
         unsafe{
             let llvm_context =  llvm::core::LLVMContextCreate();
-            let llvm_module = llvm::core::LLVMModuleCreateWithNameInContext(module_name.as_ptr() as *const i8, llvm_context);
+            let llvm_module = llvm::core::LLVMModuleCreateWithNameInContext(ffi::CString::new("mod1").unwrap().as_ptr(), llvm_context);
             let builder = llvm::core::LLVMCreateBuilderInContext(llvm_context);
             let named_values = HashMap::new();
 
@@ -121,22 +121,25 @@ fn main(){
 
         let print_ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
         let mut pf_type_args_vec = Vec::new(); 
-        let p = libc::malloc(mem::size_of::<llvm::target::LLVMTargetDataRef>() as libc::size_t) 
-            as *mut llvm::target::LLVMTargetDataRef;
 
         //"e" is little endian because of x86
-        pf_type_args_vec.push(llvm::target::LLVMIntPtrTypeInContext(ctxt.context, 
-                                                                    llvm::target::LLVMCreateTargetData("e".as_ptr() as *const i8)));
-        //pf_type_args_vec.push(llvm::core::LLVMIntTypeInContext(ctxt.context, 32));
+        //llvm::core::LLVMSetDataLayout(ctxt.module, "e".as_ptr() as *const i8); //x86_64-linux-gnu
+        // pf_type_args_vec.push(llvm::target::LLVMIntPtrTypeInContext(ctxt.context, 
+        //                                                             llvm::target::LLVMCreateTargetData("e".as_ptr() as *const i8)));
+        
+        pf_type_args_vec.push(llvm::core::LLVMPointerType(llvm::core::LLVMIntTypeInContext(ctxt.context, 8),
+                                                          0));
+
+        
         let proto = llvm::core::LLVMFunctionType(print_ty, pf_type_args_vec.as_mut_ptr(), 1, 1);
         let print_function = llvm::core::LLVMAddFunction(ctxt.module, 
-                                                         "printf".as_ptr() as *const i8, 
+                                                         ffi::CString::new("printf").unwrap().as_ptr(), 
                                                          proto);
 
         //main protype
         let ty = llvm::core::LLVMDoubleTypeInContext(ctxt.context);
         let proto = llvm::core::LLVMFunctionType(ty, ptr::null_mut(), 0, 0);
-        let function = llvm::core::LLVMAddFunction(ctxt.module, "foo".as_ptr() as *const i8, proto);
+        let function = llvm::core::LLVMAddFunction(ctxt.module, ffi::CString::new("main").unwrap().as_ptr(), proto);
 
         
         let n1 = Expr::NumExpr(32);
@@ -150,7 +153,7 @@ fn main(){
 
         let bb = llvm::core::LLVMAppendBasicBlockInContext(ctxt.context,
                                             function,
-                                            "entry".as_ptr() as *const i8);
+                                            ffi::CString::new("entry").unwrap().as_ptr());
         llvm::core::LLVMPositionBuilderAtEnd(ctxt.builder, bb);
 
         // pub unsafe extern fn LLVMBuildCall(arg1: LLVMBuilderRef, 
@@ -159,15 +162,15 @@ fn main(){
         // NumArgs: c_uint, 
         // Name: *const c_char) -> LLVMValueRef
         let gstr = llvm::core::LLVMBuildGlobalStringPtr(ctxt.builder, 
-                                                        "abhi".as_ptr() as *const i8, 
-                                                        ".str".as_ptr() as *const i8);
+                                                        ffi::CString::new("abhi").unwrap().as_ptr(), 
+                                                        ffi::CString::new("main").unwrap().as_ptr());
         let mut pf_args = Vec::new();
         pf_args.push(gstr);
         llvm::core::LLVMBuildCall(ctxt.builder, 
                                   print_function, 
                                   pf_args.as_mut_ptr(), 
                                   1, 
-                                  "call".as_ptr() as *const i8);
+                                  ffi::CString::new("call").unwrap().as_ptr());
         //build return expression
         llvm::core::LLVMBuildRet(ctxt.builder, unwrapped_body);
 
