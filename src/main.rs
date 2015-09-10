@@ -100,8 +100,8 @@ impl IRBuilder for Expr{
         unsafe{
             match self{
                 &Expr::NumExpr(ref i) => {
-                    let ty = llvm::core::LLVMDoubleTypeInContext(ctxt.context);
-                    Ok(llvm::core::LLVMConstReal(ty, *i as f64))
+                    let ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
+                    Ok(llvm::core::LLVMConstInt(ty, *i as u64, 0))
                 },
                 &Expr::AddExpr(ref e1, ref e2) => {
                     let ev1 = try!(e1.codegen(ctxt));
@@ -137,7 +137,7 @@ fn main(){
                                                          proto);
 
         //main protype
-        let ty = llvm::core::LLVMDoubleTypeInContext(ctxt.context);
+        let ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
         let proto = llvm::core::LLVMFunctionType(ty, ptr::null_mut(), 0, 0);
         let function = llvm::core::LLVMAddFunction(ctxt.module, ffi::CString::new("main").unwrap().as_ptr(), proto);
 
@@ -163,7 +163,7 @@ fn main(){
         // Name: *const c_char) -> LLVMValueRef
         let gstr = llvm::core::LLVMBuildGlobalStringPtr(ctxt.builder, 
                                                         ffi::CString::new("abhi").unwrap().as_ptr(), 
-                                                        ffi::CString::new("main").unwrap().as_ptr());
+                                                        ffi::CString::new(".str").unwrap().as_ptr());
         let mut pf_args = Vec::new();
         pf_args.push(gstr);
         llvm::core::LLVMBuildCall(ctxt.builder, 
@@ -172,7 +172,10 @@ fn main(){
                                   1, 
                                   ffi::CString::new("call").unwrap().as_ptr());
         //build return expression
-        llvm::core::LLVMBuildRet(ctxt.builder, unwrapped_body);
+        
+        llvm::core::LLVMBuildRet(ctxt.builder, 
+                                 llvm::core::LLVMConstInt(llvm::core::LLVMIntTypeInContext(ctxt.context, 32), 0 as u64, 0));
+        
 
         ctxt.dump();
     }
