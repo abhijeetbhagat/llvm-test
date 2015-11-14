@@ -1,11 +1,11 @@
 #![feature(rustc_private)]
 #![feature(libc)]
 extern crate llvm_sys as llvm;
-extern crate rustc;
+//extern crate rustc;
 extern crate libc;
 use std::ptr;
 use std::ffi;
-use rustc::lib::llvm as rustc_llvm;
+//use rustc::lib::llvm as rustc_llvm;
 
 use std::collections::{HashMap};
 use std::mem;
@@ -116,7 +116,9 @@ impl IRBuilder for Expr{
 
 fn main(){
     unsafe{
-
+        let r = llvm::target::LLVM_InitializeNativeTarget();
+        assert_eq!(r, 0);
+        llvm::target::LLVM_InitializeNativeAsmPrinter();
         let mut ctxt = Context::new("mod1");
 
         let print_ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
@@ -178,5 +180,20 @@ fn main(){
         
 
         ctxt.dump();
+        let target_ref = llvm::target_machine::LLVMGetFirstTarget();
+//Triple: *const c_char, CPU: *const c_char, Features: *const c_char, Level: LLVMCodeGenOptLevel, Reloc: LLVMRelocMode, CodeModel: LLVMCodeModel)
+        let target_mc = llvm::target_machine::LLVMCreateTargetMachine(target_ref, 
+                                                      llvm::target_machine::LLVMGetDefaultTargetTriple(),
+                                                      ffi::CString::new("x86").unwrap().as_ptr(),
+                                                      ffi::CString::new("").unwrap().as_ptr(),
+                                                      llvm::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+                                                      llvm::target_machine::LLVMRelocMode::LLVMRelocDefault,
+                                                      llvm::target_machine::LLVMCodeModel::LLVMCodeModelDefault );
+        assert!(target_mc != ptr::null_mut());
+        llvm::target_machine::LLVMTargetMachineEmitToFile(target_mc, 
+                                                          ctxt.module,
+                                                          ffi::CString::new("a.o").unwrap().into_raw(),
+                                                          llvm::target_machine::LLVMCodeGenFileType::LLVMAssemblyFile,
+                                                          ffi::CString::new("").unwrap().into_raw() as *mut *mut libc::c_char);
     }
 }
