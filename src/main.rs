@@ -137,7 +137,13 @@ fn main(){
         let print_function = llvm::core::LLVMAddFunction(ctxt.module, 
                                                          ffi::CString::new("printf").unwrap().as_ptr(), 
                                                          proto);
-
+        let exit_ty = llvm::core::LLVMVoidTypeInContext(ctxt.context);
+        let mut exit_type_args_vec = Vec::new();
+        exit_type_args_vec.push(llvm::core::LLVMIntTypeInContext(ctxt.context, 32));
+        let exit_proto = llvm::core::LLVMFunctionType(exit_ty, exit_type_args_vec.as_mut_ptr(), 1, 0);
+        let exit_function = llvm::core::LLVMAddFunction(ctxt.module,
+                                                      ffi::CString::new("exit").unwrap().as_ptr(),
+                                                      exit_proto);
         //main protype
         let ty = llvm::core::LLVMIntTypeInContext(ctxt.context, 32);
         let proto = llvm::core::LLVMFunctionType(ty, ptr::null_mut(), 0, 0);
@@ -164,7 +170,7 @@ fn main(){
         // NumArgs: c_uint, 
         // Name: *const c_char) -> LLVMValueRef
         let gstr = llvm::core::LLVMBuildGlobalStringPtr(ctxt.builder, 
-                                                        ffi::CString::new("abhi").unwrap().as_ptr(), 
+                                                        ffi::CString::new("abhi\n").unwrap().as_ptr(), 
                                                         ffi::CString::new(".str").unwrap().as_ptr());
         let mut pf_args = Vec::new();
         pf_args.push(gstr);
@@ -174,6 +180,13 @@ fn main(){
                                   1, 
                                   ffi::CString::new("call").unwrap().as_ptr());
         //build return expression
+        let mut exit_args = Vec::new();
+        exit_args.push(llvm::core::LLVMConstInt(llvm::core::LLVMIntTypeInContext(ctxt.context, 32), 0 as u64, 0));
+        llvm::core::LLVMBuildCall(ctxt.builder, 
+                                  exit_function, 
+                                  exit_args.as_mut_ptr(), 
+                                  1, 
+                                  ffi::CString::new("call").unwrap().as_ptr());
         
         llvm::core::LLVMBuildRet(ctxt.builder, 
                                  llvm::core::LLVMConstInt(llvm::core::LLVMIntTypeInContext(ctxt.context, 32), 0 as u64, 0));
@@ -184,7 +197,7 @@ fn main(){
 //Triple: *const c_char, CPU: *const c_char, Features: *const c_char, Level: LLVMCodeGenOptLevel, Reloc: LLVMRelocMode, CodeModel: LLVMCodeModel)
         let target_mc = llvm::target_machine::LLVMCreateTargetMachine(target_ref, 
                                                       llvm::target_machine::LLVMGetDefaultTargetTriple(),
-                                                      ffi::CString::new("x86").unwrap().as_ptr(),
+                                                      ffi::CString::new("i386").unwrap().as_ptr(),
                                                       ffi::CString::new("").unwrap().as_ptr(),
                                                       llvm::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
                                                       llvm::target_machine::LLVMRelocMode::LLVMRelocDefault,
@@ -193,7 +206,7 @@ fn main(){
         llvm::target_machine::LLVMTargetMachineEmitToFile(target_mc, 
                                                           ctxt.module,
                                                           ffi::CString::new("a.o").unwrap().into_raw(),
-                                                          llvm::target_machine::LLVMCodeGenFileType::LLVMAssemblyFile,
+                                                          llvm::target_machine::LLVMCodeGenFileType::LLVMObjectFile,
                                                           ffi::CString::new("").unwrap().into_raw() as *mut *mut libc::c_char);
     }
 }
