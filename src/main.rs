@@ -5,6 +5,7 @@ extern crate llvm_sys as llvm;
 extern crate libc;
 use std::ptr;
 use std::ffi;
+use std::process::Command;
 //use rustc::lib::llvm as rustc_llvm;
 
 use std::collections::{HashMap};
@@ -205,8 +206,25 @@ fn main(){
         assert!(target_mc != ptr::null_mut());
         llvm::target_machine::LLVMTargetMachineEmitToFile(target_mc, 
                                                           ctxt.module,
-                                                          ffi::CString::new("a.o").unwrap().into_raw(),
+                                                          ffi::CString::new("tmp.o").unwrap().into_raw(),
                                                           llvm::target_machine::LLVMCodeGenFileType::LLVMObjectFile,
                                                           ffi::CString::new("").unwrap().into_raw() as *mut *mut libc::c_char);
+
+        let out = Command::new("ld")
+            .arg("--dynamic-linker")
+            .arg("/lib64/ld-linux-x86-64.so.2") 
+            .arg("tmp.o")
+            .arg("-o")
+            .arg("first")
+            .arg("-lc")
+            .arg("--entry")
+            .arg("main")
+            .output()
+            .unwrap_or_else(|e|{
+                panic!("failed to compile - {}", e);
+            });
+        println!("{}", String::from_utf8_lossy(&out.stdout));
+        println!("{}", String::from_utf8_lossy(&out.stderr));
+            
     }
 }
