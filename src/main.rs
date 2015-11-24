@@ -115,6 +115,11 @@ impl IRBuilder for Expr{
     }
 }
 
+//int printf(const char*, ...);
+//int main(){
+//  printf("abhi\n");
+//  return 0;
+//}
 fn main(){
     unsafe{
         let r = llvm::target::LLVM_InitializeNativeTarget();
@@ -132,9 +137,9 @@ fn main(){
         
         pf_type_args_vec.push(llvm::core::LLVMPointerType(llvm::core::LLVMIntTypeInContext(ctxt.context, 8),
                                                           0));
-
+        pf_type_args_vec.push(llvm::core::LLVMIntTypeInContext(ctxt.context, 32)) ;
         
-        let proto = llvm::core::LLVMFunctionType(print_ty, pf_type_args_vec.as_mut_ptr(), 1, 1);
+        let proto = llvm::core::LLVMFunctionType(print_ty, pf_type_args_vec.as_mut_ptr(), 2, 1);
         let print_function = llvm::core::LLVMAddFunction(ctxt.module, 
                                                          ffi::CString::new("printf").unwrap().as_ptr(), 
                                                          proto);
@@ -165,30 +170,23 @@ fn main(){
                                             ffi::CString::new("entry").unwrap().as_ptr());
         llvm::core::LLVMPositionBuilderAtEnd(ctxt.builder, bb);
 
-        // pub unsafe extern fn LLVMBuildCall(arg1: LLVMBuilderRef, 
-        // Fn: LLVMValueRef, 
-        // Args: *mut LLVMValueRef, 
-        // NumArgs: c_uint, 
-        // Name: *const c_char) -> LLVMValueRef
+        let alloca = llvm::core::LLVMBuildAlloca(ctxt.builder, llvm::core::LLVMIntTypeInContext(ctxt.context, 32), ffi::CString::new("a").unwrap().as_ptr());
+        let store = llvm::core::LLVMBuildStore(ctxt.builder, 
+                                               llvm::core::LLVMConstInt(llvm::core::LLVMIntTypeInContext(ctxt.context, 32), 345 as u64, 0),
+                                               alloca);
+
         let gstr = llvm::core::LLVMBuildGlobalStringPtr(ctxt.builder, 
-                                                        ffi::CString::new("abhi\n").unwrap().as_ptr(), 
+                                                        ffi::CString::new("%d\n").unwrap().as_ptr(), 
                                                         ffi::CString::new(".str").unwrap().as_ptr());
         let mut pf_args = Vec::new();
         pf_args.push(gstr);
+        let l = llvm::core::LLVMBuildLoad(ctxt.builder, alloca, ffi::CString::new("a").unwrap().as_ptr());
+        pf_args.push(l);
         llvm::core::LLVMBuildCall(ctxt.builder, 
                                   print_function, 
                                   pf_args.as_mut_ptr(), 
-                                  1, 
+                                  2, 
                                   ffi::CString::new("call").unwrap().as_ptr());
-        //build return expression
-        let mut exit_args = Vec::new();
-        exit_args.push(llvm::core::LLVMConstInt(llvm::core::LLVMIntTypeInContext(ctxt.context, 32), 0 as u64, 0));
-        llvm::core::LLVMBuildCall(ctxt.builder, 
-                                  exit_function, 
-                                  exit_args.as_mut_ptr(), 
-                                  1, 
-                                  ffi::CString::new("call").unwrap().as_ptr());
-        
         llvm::core::LLVMBuildRet(ctxt.builder, 
                                  llvm::core::LLVMConstInt(llvm::core::LLVMIntTypeInContext(ctxt.context, 32), 0 as u64, 0));
         
@@ -210,15 +208,10 @@ fn main(){
                                                           llvm::target_machine::LLVMCodeGenFileType::LLVMObjectFile,
                                                           ffi::CString::new("").unwrap().into_raw() as *mut *mut libc::c_char);
 
-        let out = Command::new("ld")
-            .arg("--dynamic-linker")
-            .arg("/lib64/ld-linux-x86-64.so.2") 
+        let out = Command::new("gcc")
             .arg("tmp.o")
             .arg("-o")
             .arg("first")
-            .arg("-lc")
-            .arg("--entry")
-            .arg("main")
             .output()
             .unwrap_or_else(|e|{
                 panic!("failed to compile - {}", e);
